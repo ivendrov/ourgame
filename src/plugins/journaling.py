@@ -47,14 +47,12 @@ class JournalingPlugin(Plugin):
 
         # Start background tasks
         self.check_daily_reset.start()
-        self.update_channel_access.start()
 
         self.logger.info("Journaling plugin setup complete")
 
     async def teardown(self) -> None:
         """Cleanup the plugin."""
         self.check_daily_reset.cancel()
-        self.update_channel_access.cancel()
         self.logger.info("Journaling plugin teardown complete")
 
     async def on_message(self, message: discord.Message) -> None:
@@ -173,10 +171,40 @@ class JournalingPlugin(Plugin):
 
             # Send feedback message
             if total_words >= Config.DAILY_WORD_REQUIREMENT:
-                # Congratulate on reaching the goal
-                await message.reply(
-                    f"🎉 Congratulations! You've written **{total_words}** words today and unlocked access to the shared channel!"
-                )
+                # Grant access to shared channel
+                shared_channel = self.bot.guild.get_channel(Config.SHARED_CHANNEL_ID)
+                if shared_channel:
+                    member = self.bot.guild.get_member(user_id)
+                    if member:
+                        try:
+                            await shared_channel.set_permissions(
+                                member,
+                                read_messages=True,
+                                send_messages=True
+                            )
+                            # Congratulate and link to the channel
+                            await message.reply(
+                                f"🎉 Congratulations! You've written **{total_words}** words today and unlocked access to {shared_channel.mention}!"
+                            )
+                        except discord.Forbidden:
+                            self.logger.error(f"Failed to grant permissions to {member.name}: Missing permissions")
+                            await message.reply(
+                                f"🎉 You've written **{total_words}** words today! (Note: Unable to automatically grant channel access - please contact an admin)"
+                            )
+                        except Exception as e:
+                            self.logger.error(f"Error granting channel access to {member.name}: {e}")
+                            await message.reply(
+                                f"🎉 You've written **{total_words}** words today! (Note: There was an error granting channel access)"
+                            )
+                    else:
+                        await message.reply(
+                            f"🎉 Congratulations! You've written **{total_words}** words today and unlocked access to the shared channel!"
+                        )
+                else:
+                    self.logger.error(f"Shared channel {Config.SHARED_CHANNEL_ID} not found")
+                    await message.reply(
+                        f"🎉 Congratulations! You've written **{total_words}** words today!"
+                    )
             else:
                 # Show remaining words needed
                 remaining = Config.DAILY_WORD_REQUIREMENT - total_words
@@ -222,71 +250,6 @@ class JournalingPlugin(Plugin):
     def get_current_date(self) -> date:
         """Get current date in configured timezone."""
         return datetime.now(Config.TIMEZONE).date()
-
-    @tasks.loop(minutes=5)
-    async def update_channel_access(self) -> None:
-        """Periodically update shared channel access based on daily stats."""
-        try:
-            today = self.get_current_date()
-            stats = await self.bot.db.get_daily_stats_for_date(today)
-
-            shared_channel = self.bot.guild.get_channel(Config.SHARED_CHANNEL_ID)
-            if not shared_channel:
-                self.logger.error(f"Shared channel {Config.SHARED_CHANNEL_ID} not found")
-                return
-
-            # Check bot permissions
-            bot_permissions = shared_channel.permissions_for(self.bot.guild.me)
-            if not bot_permissions.manage_permissions:
-                self.logger.error(
-                    f"Bot lacks 'Manage Permissions' permission in channel {shared_channel.name}. "
-                    f"Please grant this permission to enable access control."
-                )
-                return
-
-            # Get all users with journal channels
-            all_users = await self.bot.db.get_all_users_with_journals()
-
-            for user_data in all_users:
-                discord_id = user_data['discord_id']
-                member = self.bot.guild.get_member(discord_id)
-
-                if not member:
-                    continue
-
-                # Find user's stats for today
-                user_stats = next((s for s in stats if s['discord_id'] == discord_id), None)
-                has_access = user_stats['has_access'] if user_stats else False
-
-                try:
-                    # Update channel permissions
-                    if has_access:
-                        await shared_channel.set_permissions(
-                            member,
-                            read_messages=True,
-                            send_messages=True
-                        )
-                    else:
-                        await shared_channel.set_permissions(
-                            member,
-                            overwrite=None  # Remove explicit permissions
-                        )
-                except discord.Forbidden:
-                    self.logger.error(f"Failed to update permissions for {member.name}: Missing permissions")
-                    continue
-                except Exception as e:
-                    self.logger.error(f"Failed to update permissions for {member.name}: {e}")
-                    continue
-
-            self.logger.info(f"Updated shared channel access for {len(all_users)} users")
-
-        except Exception as e:
-            self.logger.error(f"Error updating channel access: {e}")
-
-    @update_channel_access.before_loop
-    async def before_update_channel_access(self):
-        """Wait until bot is ready before starting the task."""
-        await self.bot.wait_until_ready()
 
     @tasks.loop(hours=1)
     async def check_daily_reset(self) -> None:
