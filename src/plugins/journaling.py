@@ -167,16 +167,33 @@ class JournalingPlugin(Plugin):
                 word_count=word_count
             )
 
-            # Update daily stats
-            await self.update_user_daily_stats(user_id)
+            # Update daily stats and get the updated totals
+            total_words = await self.update_user_daily_stats(user_id)
+
+            # Send feedback message
+            if total_words >= Config.DAILY_WORD_REQUIREMENT:
+                # Congratulate on reaching the goal
+                await message.reply(
+                    f"🎉 Congratulations! You've written **{total_words}** words today and unlocked access to the shared channel!"
+                )
+            else:
+                # Show remaining words needed
+                remaining = Config.DAILY_WORD_REQUIREMENT - total_words
+                await message.reply(
+                    f"✍️ **{total_words}** words written today. **{remaining}** more to unlock the shared channel!"
+                )
 
             self.logger.debug(f"Recorded journal entry for user {user_id}: {word_count} words")
 
         except Exception as e:
             self.logger.error(f"Error handling journal message: {e}")
 
-    async def update_user_daily_stats(self, discord_id: int) -> None:
-        """Update daily stats for a user."""
+    async def update_user_daily_stats(self, discord_id: int) -> int:
+        """Update daily stats for a user.
+
+        Returns:
+            Total word count for the day
+        """
         try:
             today = self.get_current_date()
 
@@ -195,8 +212,11 @@ class JournalingPlugin(Plugin):
 
             self.logger.debug(f"Updated daily stats for user {discord_id}: {total_words} words, access={has_access}")
 
+            return total_words
+
         except Exception as e:
             self.logger.error(f"Error updating daily stats for user {discord_id}: {e}")
+            return 0
 
     def get_current_date(self) -> date:
         """Get current date in configured timezone."""
