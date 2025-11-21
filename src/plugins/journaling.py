@@ -20,7 +20,7 @@ class JournalingPlugin(Plugin):
 
         # Configure Gemini
         genai.configure(api_key=Config.GEMINI_API_KEY)
-        self.gemini_model = genai.GenerativeModel('gemini-pro')
+        self.gemini_model = genai.GenerativeModel(Config.GEMINI_MODEL)
 
     @property
     def name(self) -> str:
