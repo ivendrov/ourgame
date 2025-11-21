@@ -68,7 +68,8 @@ ourgame/
 1. Create a new project at [supabase.com](https://supabase.com)
 2. Go to Project Settings > API to get your URL and anon key
 3. Go to SQL Editor and run the schema from `database/schema.sql`
-4. Enable real-time for the tables (optional but recommended):
+4. **If upgrading from an earlier version**: Run the migration script `database/migration_add_username.sql` to add username support to existing journal entries
+5. Enable real-time for the tables (optional but recommended):
    - Go to Database > Replication
    - Enable replication for `users`, `journal_entries`, and `daily_stats` tables
 

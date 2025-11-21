@@ -65,7 +65,7 @@ class Database:
             return []
 
     # Journal entry operations
-    async def create_journal_entry(self, discord_id: int, message_id: int,
+    async def create_journal_entry(self, discord_id: int, username: str, message_id: int,
                                    channel_id: int, content: str, word_count: int) -> None:
         """Create a new journal entry."""
         try:
@@ -77,6 +77,7 @@ class Database:
             entry = {
                 'user_id': user['id'],
                 'discord_id': discord_id,
+                'discord_username': username,
                 'message_id': message_id,
                 'channel_id': channel_id,
                 'content': content,
