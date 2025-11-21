@@ -55,7 +55,12 @@ ourgame/
 5. Copy the bot token
 6. Go to OAuth2 > URL Generator:
    - Select scopes: `bot`, `applications.commands`
-   - Select bot permissions: `Manage Channels`, `Read Messages/View Channels`, `Send Messages`, `Manage Roles`, `Read Message History`
+   - Select bot permissions:
+     - `Manage Channels` (to create journal channels)
+     - `Manage Permissions` (to control access to shared channel)
+     - `Read Messages/View Channels`
+     - `Send Messages`
+     - `Read Message History`
 7. Use the generated URL to invite the bot to your server
 
 ### 2. Supabase Setup
@@ -77,8 +82,13 @@ ourgame/
 
 1. In your Discord server, create a text channel (e.g., `#shared-journal`)
 2. Set default permissions so that `@everyone` cannot see this channel
-3. Copy the channel ID (right-click channel > Copy ID - enable Developer Mode if needed)
-4. Get your server (guild) ID the same way
+3. **IMPORTANT**: Give the bot explicit permissions in this channel:
+   - Right-click the channel > Edit Channel > Permissions
+   - Add the bot role or bot user
+   - Enable: `View Channel`, `Send Messages`, `Read Message History`, and **`Manage Permissions`**
+   - The bot MUST have `Manage Permissions` to control user access to this channel
+4. Copy the channel ID (right-click channel > Copy ID - enable Developer Mode if needed)
+5. Get your server (guild) ID the same way
 
 ### 5. Install and Configure
 
@@ -111,6 +121,7 @@ SUPABASE_KEY=your_supabase_anon_key_here
 
 # Google Gemini Configuration
 GEMINI_API_KEY=your_gemini_api_key_here
+GEMINI_MODEL=gemini-2.0-flash-exp
 
 # Bot Configuration
 DAILY_WORD_REQUIREMENT=500
@@ -230,9 +241,13 @@ await self.bot.db.update_daily_stats(discord_id, date, total_words, has_access)
 - Ensure Message Content Intent is enabled in Discord Developer Portal
 - Check that the bot is online and connected
 
-### Channel permissions issues
+### Channel permissions issues / "403 Forbidden (error code: 50013): Missing Permissions"
 - Make sure the bot has "Manage Channels" and "Manage Permissions" in the server
+- **Most common issue**: The bot needs explicit "Manage Permissions" on the shared channel itself
+  - Go to the shared channel > Edit Channel > Permissions
+  - Add the bot and enable "Manage Permissions"
 - Verify the bot role is high enough in the role hierarchy
+- Check the bot logs for specific permission errors - they will indicate which channel needs attention
 
 ### Database errors
 - Verify Supabase credentials in .env
