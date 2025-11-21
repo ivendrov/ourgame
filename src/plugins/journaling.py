@@ -234,6 +234,15 @@ class JournalingPlugin(Plugin):
                 self.logger.error(f"Shared channel {Config.SHARED_CHANNEL_ID} not found")
                 return
 
+            # Check bot permissions
+            bot_permissions = shared_channel.permissions_for(self.bot.guild.me)
+            if not bot_permissions.manage_permissions:
+                self.logger.error(
+                    f"Bot lacks 'Manage Permissions' permission in channel {shared_channel.name}. "
+                    f"Please grant this permission to enable access control."
+                )
+                return
+
             # Get all users with journal channels
             all_users = await self.bot.db.get_all_users_with_journals()
 
@@ -248,18 +257,25 @@ class JournalingPlugin(Plugin):
                 user_stats = next((s for s in stats if s['discord_id'] == discord_id), None)
                 has_access = user_stats['has_access'] if user_stats else False
 
-                # Update channel permissions
-                if has_access:
-                    await shared_channel.set_permissions(
-                        member,
-                        read_messages=True,
-                        send_messages=True
-                    )
-                else:
-                    await shared_channel.set_permissions(
-                        member,
-                        overwrite=None  # Remove explicit permissions
-                    )
+                try:
+                    # Update channel permissions
+                    if has_access:
+                        await shared_channel.set_permissions(
+                            member,
+                            read_messages=True,
+                            send_messages=True
+                        )
+                    else:
+                        await shared_channel.set_permissions(
+                            member,
+                            overwrite=None  # Remove explicit permissions
+                        )
+                except discord.Forbidden:
+                    self.logger.error(f"Failed to update permissions for {member.name}: Missing permissions")
+                    continue
+                except Exception as e:
+                    self.logger.error(f"Failed to update permissions for {member.name}: {e}")
+                    continue
 
             self.logger.info(f"Updated shared channel access for {len(all_users)} users")
 
