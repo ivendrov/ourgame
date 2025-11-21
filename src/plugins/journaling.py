@@ -161,6 +161,7 @@ class JournalingPlugin(Plugin):
             # Store journal entry
             await self.bot.db.create_journal_entry(
                 discord_id=user_id,
+                username=message.author.name,
                 message_id=message.id,
                 channel_id=message.channel.id,
                 content=content,
@@ -339,22 +340,36 @@ class JournalingPlugin(Plugin):
                 await interaction.followup.send("No journal entries found for today!")
                 return
 
-            # Aggregate journal content (anonymized)
-            journal_texts = []
-            for i, entry in enumerate(entries, 1):
-                journal_texts.append(f"Journal {i}:\n{entry['content']}\n")
+            # Group entries by user
+            from collections import defaultdict
+            users_journals = defaultdict(list)
 
-            aggregated_journals = "\n---\n".join(journal_texts)
+            for entry in entries:
+                user_key = (entry['discord_id'], entry['discord_username'])
+                users_journals[user_key].append(entry)
+
+            # Format journals grouped by user
+            journal_texts = []
+            for (discord_id, username), user_entries in users_journals.items():
+                # Sort entries by timestamp for this user
+                user_entries_sorted = sorted(user_entries, key=lambda e: e['created_at'])
+
+                # Concatenate all entries for this user
+                user_journal_text = "\n\n".join(entry['content'] for entry in user_entries_sorted)
+
+                journal_texts.append(f"{username}'s journal:\n{user_journal_text}")
+
+            aggregated_journals = "\n\n---\n\n".join(journal_texts)
 
             # Create prompt for Gemini
-            full_prompt = f"""You have access to multiple anonymous journal entries from today.
+            full_prompt = f"""You have access to journal entries from multiple users from today.
 Here are the journals:
 
 {aggregated_journals}
 
 User's request: {prompt}
 
-Please respond to the user's request based on these journal entries. The journals are anonymous - don't try to identify individuals."""
+Please respond to the user's request based on these journal entries."""
 
             # Call Gemini API
             response = self.gemini_model.generate_content(full_prompt)

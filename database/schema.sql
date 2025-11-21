@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     discord_id BIGINT NOT NULL,
+    discord_username TEXT NOT NULL,
     content TEXT NOT NULL,
     word_count INTEGER NOT NULL,
     message_id BIGINT UNIQUE NOT NULL,
