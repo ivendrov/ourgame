@@ -319,6 +319,16 @@ class JournalingPlugin(Plugin):
     async def handle_gemini_command(self, interaction: discord.Interaction, prompt: str) -> None:
         """Handle /gemini command to run prompts over all journals."""
         try:
+            # Check if command is used in the shared channel
+            if interaction.channel_id != Config.SHARED_CHANNEL_ID:
+                shared_channel = self.bot.guild.get_channel(Config.SHARED_CHANNEL_ID)
+                channel_mention = shared_channel.mention if shared_channel else "the shared journaling channel"
+                await interaction.response.send_message(
+                    f"The /gemini command can only be used in {channel_mention}!",
+                    ephemeral=True
+                )
+                return
+
             # Check if user has access today
             today = self.get_current_date()
             user_stats = await self.bot.db.get_or_create_daily_stats(interaction.user.id, today)
