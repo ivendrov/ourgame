@@ -81,7 +81,8 @@ class JournalingPlugin(Plugin):
 
             # Check if user already has a journal channel
             if db_user.get('journal_channel_id'):
-                channel = self.bot.guild.get_channel(db_user['journal_channel_id'])
+                channel = self.bot.guild.get_channel(
+                    db_user['journal_channel_id'])
                 if channel:
                     await message.reply(
                         f"You already have a journal channel: {channel.mention}\n"
@@ -101,7 +102,8 @@ class JournalingPlugin(Plugin):
                 # Another instance already created a channel, use that one instead
                 db_user = await self.bot.db.get_user_by_discord_id(user.id)
                 if db_user and db_user.get('journal_channel_id'):
-                    existing_channel = self.bot.guild.get_channel(db_user['journal_channel_id'])
+                    existing_channel = self.bot.guild.get_channel(
+                        db_user['journal_channel_id'])
                     if existing_channel and existing_channel.id != channel.id:
                         # Delete the duplicate channel we just created
                         await channel.delete()
@@ -133,12 +135,15 @@ class JournalingPlugin(Plugin):
         channel_name = f"journal-{user.name}".lower().replace(" ", "-")
 
         # Check if channel already exists
-        existing_channel = discord.utils.get(guild.text_channels, name=channel_name)
+        existing_channel = discord.utils.get(
+            guild.text_channels, name=channel_name)
         if existing_channel:
             # Verify user has access to it
-            user_permissions = existing_channel.permissions_for(guild.get_member(user.id))
+            user_permissions = existing_channel.permissions_for(
+                guild.get_member(user.id))
             if user_permissions.read_messages:
-                self.logger.info(f"Found existing journal channel {channel_name} for user {user.name}")
+                self.logger.info(
+                    f"Found existing journal channel {channel_name} for user {user.name}")
                 return existing_channel
 
         # Set permissions - only user and bot can see
@@ -152,10 +157,11 @@ class JournalingPlugin(Plugin):
         channel = await guild.create_text_channel(
             name=channel_name,
             overwrites=overwrites,
-            topic=f"Private journal for {user.name}"
+            topic=f"Journal for {user.name}. This data may be shared with other journallers!"
         )
 
-        self.logger.info(f"Created journal channel {channel.name} for user {user.name}")
+        self.logger.info(
+            f"Created journal channel {channel.name} for user {user.name}")
         return channel
 
     async def is_journal_channel(self, channel: discord.TextChannel) -> bool:
@@ -193,7 +199,8 @@ class JournalingPlugin(Plugin):
             # Send feedback message
             if total_words >= Config.DAILY_WORD_REQUIREMENT:
                 # Grant access to shared channel
-                shared_channel = self.bot.guild.get_channel(Config.SHARED_CHANNEL_ID)
+                shared_channel = self.bot.guild.get_channel(
+                    Config.SHARED_CHANNEL_ID)
                 if shared_channel:
                     member = self.bot.guild.get_member(user_id)
                     if member:
@@ -208,12 +215,14 @@ class JournalingPlugin(Plugin):
                                 f"🎉 Congratulations! You've written **{total_words}** words today and unlocked access to {shared_channel.mention}!"
                             )
                         except discord.Forbidden:
-                            self.logger.error(f"Failed to grant permissions to {member.name}: Missing permissions")
+                            self.logger.error(
+                                f"Failed to grant permissions to {member.name}: Missing permissions")
                             await message.reply(
                                 f"🎉 You've written **{total_words}** words today! (Note: Unable to automatically grant channel access - please contact an admin)"
                             )
                         except Exception as e:
-                            self.logger.error(f"Error granting channel access to {member.name}: {e}")
+                            self.logger.error(
+                                f"Error granting channel access to {member.name}: {e}")
                             await message.reply(
                                 f"🎉 You've written **{total_words}** words today! (Note: There was an error granting channel access)"
                             )
@@ -222,7 +231,8 @@ class JournalingPlugin(Plugin):
                             f"🎉 Congratulations! You've written **{total_words}** words today and unlocked access to the shared channel!"
                         )
                 else:
-                    self.logger.error(f"Shared channel {Config.SHARED_CHANNEL_ID} not found")
+                    self.logger.error(
+                        f"Shared channel {Config.SHARED_CHANNEL_ID} not found")
                     await message.reply(
                         f"🎉 Congratulations! You've written **{total_words}** words today!"
                     )
@@ -233,7 +243,8 @@ class JournalingPlugin(Plugin):
                     f"✍️ **{total_words}** words written today. **{remaining}** more to unlock the shared channel!"
                 )
 
-            self.logger.debug(f"Recorded journal entry for user {user_id}: {word_count} words")
+            self.logger.debug(
+                f"Recorded journal entry for user {user_id}: {word_count} words")
 
         except Exception as e:
             self.logger.error(f"Error handling journal message: {e}")
@@ -260,12 +271,14 @@ class JournalingPlugin(Plugin):
             await self.bot.db.get_or_create_daily_stats(discord_id, today)
             await self.bot.db.update_daily_stats(discord_id, today, total_words, has_access)
 
-            self.logger.debug(f"Updated daily stats for user {discord_id}: {total_words} words, access={has_access}")
+            self.logger.debug(
+                f"Updated daily stats for user {discord_id}: {total_words} words, access={has_access}")
 
             return total_words
 
         except Exception as e:
-            self.logger.error(f"Error updating daily stats for user {discord_id}: {e}")
+            self.logger.error(
+                f"Error updating daily stats for user {discord_id}: {e}")
             return 0
 
     def get_current_date(self) -> date:
@@ -282,15 +295,18 @@ class JournalingPlugin(Plugin):
             # Check if it's a new day and past midnight
             if now.hour == 0:
                 # Revoke access from shared channel for all users
-                shared_channel = self.bot.guild.get_channel(Config.SHARED_CHANNEL_ID)
+                shared_channel = self.bot.guild.get_channel(
+                    Config.SHARED_CHANNEL_ID)
                 if shared_channel:
                     all_users = await self.bot.db.get_all_users_with_journals()
                     for user_data in all_users:
-                        member = self.bot.guild.get_member(user_data['discord_id'])
+                        member = self.bot.guild.get_member(
+                            user_data['discord_id'])
                         if member:
                             await shared_channel.set_permissions(member, overwrite=None)
 
-                    self.logger.info(f"Reset daily access for new day: {today}")
+                    self.logger.info(
+                        f"Reset daily access for new day: {today}")
 
         except Exception as e:
             self.logger.error(f"Error in daily reset check: {e}")
@@ -305,7 +321,8 @@ class JournalingPlugin(Plugin):
         try:
             # Check if command is used in the shared channel
             if interaction.channel_id != Config.SHARED_CHANNEL_ID:
-                shared_channel = self.bot.guild.get_channel(Config.SHARED_CHANNEL_ID)
+                shared_channel = self.bot.guild.get_channel(
+                    Config.SHARED_CHANNEL_ID)
                 channel_mention = shared_channel.mention if shared_channel else "the shared journaling channel"
                 await interaction.response.send_message(
                     f"The /gemini command can only be used in {channel_mention}!",
@@ -346,12 +363,15 @@ class JournalingPlugin(Plugin):
             journal_texts = []
             for (discord_id, username), user_entries in users_journals.items():
                 # Sort entries by timestamp for this user
-                user_entries_sorted = sorted(user_entries, key=lambda e: e['created_at'])
+                user_entries_sorted = sorted(
+                    user_entries, key=lambda e: e['created_at'])
 
                 # Concatenate all entries for this user
-                user_journal_text = "\n\n".join(entry['content'] for entry in user_entries_sorted)
+                user_journal_text = "\n\n".join(
+                    entry['content'] for entry in user_entries_sorted)
 
-                journal_texts.append(f"{username}'s journal:\n{user_journal_text}")
+                journal_texts.append(
+                    f"{username}'s journal:\n{user_journal_text}")
 
             aggregated_journals = "\n\n---\n\n".join(journal_texts)
 
@@ -372,7 +392,8 @@ Please respond to the user's request based on these journal entries."""
             response_text = response.text
             if len(response_text) > 2000:
                 # Split into chunks
-                chunks = [response_text[i:i+2000] for i in range(0, len(response_text), 2000)]
+                chunks = [response_text[i:i+2000]
+                          for i in range(0, len(response_text), 2000)]
                 await interaction.followup.send(chunks[0])
                 for chunk in chunks[1:]:
                     await interaction.channel.send(chunk)
