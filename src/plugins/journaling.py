@@ -53,6 +53,7 @@ class JournalingPlugin(Plugin):
     async def teardown(self) -> None:
         """Cleanup the plugin."""
         self.check_daily_reset.cancel()
+        self.bot.remove_listener(self.on_message, 'on_message')
         self.logger.info("Journaling plugin teardown complete")
 
     async def on_message(self, message: discord.Message) -> None:
@@ -74,10 +75,12 @@ class JournalingPlugin(Plugin):
         """Handle DM to create journal channel."""
         try:
             user = message.author
-            db_user = await self.bot.db.get_user_by_discord_id(user.id)
+
+            # Create or get user first (atomic operation)
+            db_user = await self.bot.db.get_or_create_user(user.id, user.name)
 
             # Check if user already has a journal channel
-            if db_user and db_user.get('journal_channel_id'):
+            if db_user.get('journal_channel_id'):
                 channel = self.bot.guild.get_channel(db_user['journal_channel_id'])
                 if channel:
                     await message.reply(
@@ -85,15 +88,24 @@ class JournalingPlugin(Plugin):
                         f"Please write your journal entries there!"
                     )
                     return
+                # Channel was deleted, clear the ID
+                await self.bot.db.update_user_journal_channel(user.id, None)
 
-            # Create journal channel
+            # Create journal channel (checks for duplicates)
             channel = await self.create_journal_channel(user)
 
-            # Create or update user in database
-            if not db_user:
-                db_user = await self.bot.db.get_or_create_user(user.id, user.name)
+            # Update user's journal channel ID (only if not already set by another instance)
+            updated = await self.bot.db.update_user_journal_channel(user.id, channel.id, only_if_null=True)
 
-            await self.bot.db.update_user_journal_channel(user.id, channel.id)
+            if not updated:
+                # Another instance already created a channel, use that one instead
+                db_user = await self.bot.db.get_user_by_discord_id(user.id)
+                if db_user and db_user.get('journal_channel_id'):
+                    existing_channel = self.bot.guild.get_channel(db_user['journal_channel_id'])
+                    if existing_channel and existing_channel.id != channel.id:
+                        # Delete the duplicate channel we just created
+                        await channel.delete()
+                        channel = existing_channel
 
             # Send confirmation
             await message.reply(

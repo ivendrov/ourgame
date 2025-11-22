@@ -19,29 +19,47 @@ class Database:
     async def get_or_create_user(self, discord_id: int, username: str) -> Dict[str, Any]:
         """Get existing user or create new one."""
         try:
-            # Try to get existing user
-            result = self.client.table('users').select('*').eq('discord_id', discord_id).execute()
-
-            if result.data:
-                return result.data[0]
-
-            # Create new user
+            # Use upsert to handle race conditions
             new_user = {
                 'discord_id': discord_id,
                 'discord_username': username,
             }
-            result = self.client.table('users').insert(new_user).execute()
+            result = self.client.table('users').upsert(
+                new_user,
+                on_conflict='discord_id'
+            ).execute()
+
+            if result.data:
+                return result.data[0]
+
+            # Fallback: query if upsert didn't return data
+            result = self.client.table('users').select('*').eq('discord_id', discord_id).execute()
             return result.data[0]
         except Exception as e:
             logger.error(f"Error getting/creating user {discord_id}: {e}")
             raise
 
-    async def update_user_journal_channel(self, discord_id: int, channel_id: int) -> None:
-        """Update user's journal channel ID."""
+    async def update_user_journal_channel(self, discord_id: int, channel_id: int, only_if_null: bool = False) -> bool:
+        """Update user's journal channel ID.
+
+        Args:
+            discord_id: User's Discord ID
+            channel_id: Channel ID to set (or None to clear)
+            only_if_null: Only update if journal_channel_id is currently null
+
+        Returns:
+            True if the update succeeded, False if only_if_null was True and channel was already set
+        """
         try:
-            self.client.table('users').update({
+            query = self.client.table('users').update({
                 'journal_channel_id': channel_id
-            }).eq('discord_id', discord_id).execute()
+            }).eq('discord_id', discord_id)
+
+            if only_if_null:
+                query = query.is_('journal_channel_id', 'null')
+
+            result = query.execute()
+            return len(result.data) > 0
         except Exception as e:
             logger.error(f"Error updating journal channel for user {discord_id}: {e}")
             raise
