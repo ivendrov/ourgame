@@ -120,6 +120,15 @@ class JournalingPlugin(Plugin):
         # Create channel name
         channel_name = f"journal-{user.name}".lower().replace(" ", "-")
 
+        # Check if channel already exists
+        existing_channel = discord.utils.get(guild.text_channels, name=channel_name)
+        if existing_channel:
+            # Verify user has access to it
+            user_permissions = existing_channel.permissions_for(guild.get_member(user.id))
+            if user_permissions.read_messages:
+                self.logger.info(f"Found existing journal channel {channel_name} for user {user.name}")
+                return existing_channel
+
         # Set permissions - only user and bot can see
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(read_messages=False),

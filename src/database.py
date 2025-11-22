@@ -71,8 +71,8 @@ class Database:
         try:
             user = await self.get_user_by_discord_id(discord_id)
             if not user:
-                logger.error(f"User {discord_id} not found when creating journal entry")
-                return
+                logger.warning(f"User {discord_id} not found when creating journal entry, creating user")
+                user = await self.get_or_create_user(discord_id, username)
 
             entry = {
                 'user_id': user['id'],
@@ -91,9 +91,9 @@ class Database:
     async def get_journal_entries_for_date(self, discord_id: int, target_date: date) -> List[Dict[str, Any]]:
         """Get all journal entries for a user on a specific date."""
         try:
-            # Format dates for the query
-            start_datetime = datetime.combine(target_date, datetime.min.time())
-            end_datetime = datetime.combine(target_date, datetime.max.time())
+            # Format dates for the query with timezone awareness
+            start_datetime = Config.TIMEZONE.localize(datetime.combine(target_date, datetime.min.time()))
+            end_datetime = Config.TIMEZONE.localize(datetime.combine(target_date, datetime.max.time()))
 
             result = self.client.table('journal_entries').select('*').eq(
                 'discord_id', discord_id
@@ -109,8 +109,8 @@ class Database:
     async def get_all_journal_entries_for_date(self, target_date: date) -> List[Dict[str, Any]]:
         """Get all journal entries from all users for a specific date."""
         try:
-            start_datetime = datetime.combine(target_date, datetime.min.time())
-            end_datetime = datetime.combine(target_date, datetime.max.time())
+            start_datetime = Config.TIMEZONE.localize(datetime.combine(target_date, datetime.min.time()))
+            end_datetime = Config.TIMEZONE.localize(datetime.combine(target_date, datetime.max.time()))
 
             result = self.client.table('journal_entries').select('*').gte(
                 'created_at', start_datetime.isoformat()
