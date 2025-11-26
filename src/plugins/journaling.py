@@ -344,11 +344,11 @@ class JournalingPlugin(Plugin):
             # Defer response as this might take a while
             await interaction.response.defer()
 
-            # Get all journal entries for today
-            entries = await self.bot.db.get_all_journal_entries_for_date(today)
+            # Get all journal entries (sorted by created_at descending)
+            entries = await self.bot.db.get_all_journal_entries()
 
             if not entries:
-                await interaction.followup.send("No journal entries found for today!")
+                await interaction.followup.send("No journal entries found!")
                 return
 
             # Group entries by user
@@ -359,10 +359,52 @@ class JournalingPlugin(Plugin):
                 user_key = (entry['discord_id'], entry['discord_username'])
                 users_journals[user_key].append(entry)
 
+            # Smart truncation: ensure each user gets representation, prioritize recent entries
+            TARGET_TOKENS = 100000
+            CHARS_PER_TOKEN = 4  # Approximate
+            MIN_ENTRIES_PER_USER = 3  # Minimum entries to include per user
+
+            def estimate_tokens(text: str) -> int:
+                """Estimate token count for text."""
+                return len(text) // CHARS_PER_TOKEN
+
+            # Phase 1: Include minimum entries for each user
+            selected_entries = defaultdict(list)
+            current_tokens = 0
+
+            for user_key, user_entries in users_journals.items():
+                # Sort entries by timestamp (newest first, already sorted from DB)
+                user_entries_sorted = user_entries[:MIN_ENTRIES_PER_USER]
+
+                for entry in user_entries_sorted:
+                    entry_tokens = estimate_tokens(entry['content'])
+                    selected_entries[user_key].append(entry)
+                    current_tokens += entry_tokens
+
+            # Phase 2: Add more entries from all users in reverse chronological order
+            # until we approach the token limit
+            remaining_entries = []
+            for user_key, user_entries in users_journals.items():
+                # Add entries beyond the minimum
+                for entry in user_entries[MIN_ENTRIES_PER_USER:]:
+                    remaining_entries.append((user_key, entry))
+
+            # Sort by timestamp (newest first)
+            remaining_entries.sort(key=lambda x: x[1]['created_at'], reverse=True)
+
+            for user_key, entry in remaining_entries:
+                entry_tokens = estimate_tokens(entry['content'])
+                if current_tokens + entry_tokens > TARGET_TOKENS:
+                    break
+                selected_entries[user_key].append(entry)
+                current_tokens += entry_tokens
+
             # Format journals grouped by user
             journal_texts = []
-            for (discord_id, username), user_entries in users_journals.items():
-                # Sort entries by timestamp for this user
+            for user_key, user_entries in selected_entries.items():
+                discord_id, username = user_key
+
+                # Sort entries by timestamp for this user (oldest first for reading)
                 user_entries_sorted = sorted(
                     user_entries, key=lambda e: e['created_at'])
 
@@ -376,7 +418,7 @@ class JournalingPlugin(Plugin):
             aggregated_journals = "\n\n---\n\n".join(journal_texts)
 
             # Create prompt for Gemini
-            full_prompt = f"""You have access to journal entries from multiple users from today.
+            full_prompt = f"""You have access to journal entries from multiple users.
 Here are the journals:
 
 {aggregated_journals}

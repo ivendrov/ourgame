@@ -139,6 +139,18 @@ class Database:
             logger.error(f"Error getting all journal entries for {target_date}: {e}")
             return []
 
+    async def get_all_journal_entries(self) -> List[Dict[str, Any]]:
+        """Get all journal entries from all users, ordered by creation time descending."""
+        try:
+            result = self.client.table('journal_entries').select('*').order(
+                'created_at', desc=True
+            ).execute()
+
+            return result.data
+        except Exception as e:
+            logger.error(f"Error getting all journal entries: {e}")
+            return []
+
     # Daily stats operations
     async def get_or_create_daily_stats(self, discord_id: int, target_date: date) -> Dict[str, Any]:
         """Get or create daily stats for a user."""
