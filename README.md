@@ -11,10 +11,10 @@ A flexible Discord bot framework for building collaborative journaling games and
 - **Event-Driven Architecture**: React to Discord events with custom handlers
 
 ### Journaling Game (Starter Plugin)
-- **Private Journal Channels**: Each participant gets a private channel for writing
+- **Personal Journal Channels**: Each participant gets a dedicated channel for writing
 - **Daily Word Count**: Track words written per day (default: 500 words required)
 - **Shared Channel Access**: Automatic access control based on daily word count
-- **AI-Powered Insights**: Run LLM prompts over all journals (anonymized)
+- **AI-Powered Insights**: Run LLM prompts over all journals
 - **Daily Reset**: Automatic access revocation at end of day
 
 ## Architecture
@@ -139,7 +139,7 @@ python main.py
 
 ### For Participants
 
-1. **Create Journal Channel**: Send a DM to the bot, and it will create your private journal channel
+1. **Create Journal Channel**: Send a DM to the bot, and it will create your personal journal channel
 2. **Write Daily**: Write at least 500 words (configurable) in your journal channel each day
 3. **Access Shared Channel**: Once you meet the daily requirement, you'll automatically get access to the shared channel
 4. **Use AI Commands**: In the shared channel, use `/gemini <prompt>` to run prompts over all journals

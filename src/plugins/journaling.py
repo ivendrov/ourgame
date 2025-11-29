@@ -126,7 +126,7 @@ class JournalingPlugin(Plugin):
             await message.reply("Sorry, there was an error creating your journal channel. Please contact an admin.")
 
     async def create_journal_channel(self, user: discord.User) -> discord.TextChannel:
-        """Create a private journal channel for a user."""
+        """Create a personal journal channel for a user."""
         guild = self.bot.guild
         if not guild:
             raise ValueError("Guild not found")
@@ -157,7 +157,7 @@ class JournalingPlugin(Plugin):
         channel = await guild.create_text_channel(
             name=channel_name,
             overwrites=overwrites,
-            topic=f"Journal for {user.name}. This data may be shared with other journallers!"
+            topic=f"Personal journal for {user.name}. All entries can be read by other journalers through AI commands."
         )
 
         self.logger.info(
