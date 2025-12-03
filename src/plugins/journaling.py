@@ -7,6 +7,7 @@ import google.generativeai as genai
 from src.plugin_base import Plugin
 from src.config import Config
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,26 @@ class JournalingPlugin(Plugin):
         """Initialize the journaling plugin."""
         super().__init__(bot)
 
-        # Configure Gemini
+        # Configure Gemini with proper timeout settings
         genai.configure(api_key=Config.GEMINI_API_KEY)
-        self.gemini_model = genai.GenerativeModel(Config.GEMINI_MODEL)
+
+        # Configure generation settings with timeout
+        generation_config = {
+            'temperature': 0.7,
+            'top_p': 0.95,
+            'top_k': 40,
+            'max_output_tokens': 8192,
+        }
+
+        # Set request timeout
+        self.request_options = {
+            'timeout': 300.0  # 5 minute timeout
+        }
+
+        self.gemini_model = genai.GenerativeModel(
+            Config.GEMINI_MODEL,
+            generation_config=generation_config
+        )
 
     @property
     def name(self) -> str:
@@ -427,8 +445,29 @@ User's request: {prompt}
 
 Please respond to the user's request based on these journal entries."""
 
-            # Call Gemini API
-            response = self.gemini_model.generate_content(full_prompt)
+            # Call Gemini API (run in thread pool to avoid blocking)
+            # Add overall timeout to prevent hanging
+            try:
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.gemini_model.generate_content,
+                        full_prompt,
+                        request_options=self.request_options
+                    ),
+                    timeout=310.0  # 5 minute 10 second overall timeout (API has 5min)
+                )
+            except asyncio.TimeoutError:
+                self.logger.warning(f"Gemini API call timed out for user {interaction.user.id}")
+                await interaction.followup.send(
+                    "The request to Gemini timed out. Please try again with a shorter prompt or try again later."
+                )
+                return
+            except Exception as api_error:
+                self.logger.error(f"Gemini API error: {api_error}")
+                await interaction.followup.send(
+                    f"Error calling Gemini API: {str(api_error)}"
+                )
+                return
 
             # Send response (split if too long)
             response_text = response.text
